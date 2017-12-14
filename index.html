@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+  <head>
+  <meta charset="utf-8"/>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <script src="heatmap.js"></script>
+
+    <script>
+	    var map;
+		function initMap(cent) {
+            map = new google.maps.Map(document.getElementById('map'), {
+              zoom: 3,
+              center: cent,
+              mapTypeId: 'terrain'
+            });
+		}
+
+	$(document).ready(function(){
+	    //$('#testText').empty();
+	    $('#show').click(function() {
+	       // $('#testText').val(''); 
+	        var myData;
+	        var lat1 = parseFloat($('#lat1').val())+90;
+	        var lat2 = parseFloat($('#lat2').val())+90;
+		    var lon1 = $('#lon1').val();
+		    var lon2 = $('#lon2').val();
+		    var level = $('#level').val();
+            var url = "http://cors-proxy.htmldriven.com/?url=" +
+		    encodeURIComponent("http://144.206.233.147/thredds/dodsC/Data/s362d.nc.ascii?data["+level+":1:"+level+"]["+lon1+":1:"+lon2+"]["+lat1+":1:"+lat2+"]");
+            $.get(url, function(response) {
+			    /* some functions for comfort*/
+			    const f = (a, b) => [].concat(...a.map(d => b.map(e => [].concat(d, e))));
+                const cartesian = (a, b, ...c) => (b ? cartesian(f(a, b), ...c) : a);
+				
+		        function getMaxOfArray(numArray) {
+                    return Math.max.apply(null, numArray);
+                }
+			    
+				/* processing data */
+	            myData = response.body;
+			    console.log(myData);
+				$('#testText').append(myData);
+				myData = myData.split(/---------------------------------------------/)[1];
+				myDataArr = myData.split(/\n\n/);
+				mapData = myDataArr[0];
+				levels = myDataArr[1];
+				longs = myDataArr[2];
+				lats = myDataArr[3];
+				level = levels.split('\n')[1];
+				longs = longs.split('\n')[1].split(', ');
+				lats = lats.split('\n')[1].split(', ');
+				mapData = mapData.split('\n');
+				
+				/* preparing data for heat map */
+				var longLats = cartesian(lats, longs);
+				var dataH = [];
+				var dataChunk = [];
+				for(var i = 1; i < mapData.length; i++) {
+				    dataChunk = mapData[i].split(',');
+					dataChunk.shift();
+				    dataH+=dataChunk.join();
+				}
+				dataH = dataH.split(' ');
+				dataH.shift();
+				lat1 = parseFloat(lat1);
+				lat2 = parseFloat(lat2);
+				lon1 = parseFloat(lon1);
+				lon2 = parseFloat(lon2);
+                clat = lat1 + (lat2-lat1)/2 - 90;
+				clng = lon1 + (lon2-lon1)/2;
+				console.log(clng, clat);
+				cent = {lat: clat, lng: clng};
+				initMap(cent);
+				var heatmapData = []
+                for (var i = 0; i < longLats.length; i++) {
+					var w = parseFloat(dataH[i])*level;
+					heatmapDataChunk = {lat: parseFloat(longLats[i][0]), lng:parseFloat(longLats[i][1]), count: w}
+
+                    heatmapData.push(heatmapDataChunk);
+                }
+				heatmap = new HeatmapOverlay(map,
+                {
+                    "radius": 3,
+                    "maxOpacity": 1, 
+                    "scaleRadius": true, 
+                    "useLocalExtrema": true,
+                    latField: 'lat',
+                    lngField: 'lng',
+                    valueField: 'count'
+                }
+                );
+                var testData = {
+                    max: getMaxOfArray(dataH)*level,
+                    data: heatmapData
+                };
+                heatmap.setData(testData);
+            });
+	    });
+	});
+    </script>
+    <script 
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAPqODETI6USWjj7vI3QlCuIdbxjd2PYns&libraries=visualization">
+    </script>
+	<script  src="gmaps-heatmap.js"></script>
+  </head>
+  <body>
+    <div class="input fields" style="text-align:center;">
+	    <span>Широта:</span><input type="text" id="lat1" style="margin-left:10px;width:40px;"><input type="text" id="lat2" style="margin-left:10px;width:40px;">
+		<span style="margin-left:20px;">Долгота:</span><input type="text" id="lon1" style="margin-left:10px;width:40px;"><input type="text" id="lon2" style="margin-left:10px;width:40px;">
+		<span style="margin-left:20px;">Уровень:</span><input type="text" id="level" style="margin-left:10px;width:40px;">
+		<button id="show" style="margin-top:10px;margin-left:20px;">Показать</button>
+		</br></br>
+		<textarea id="testText"></textarea>
+	</div>
+    <div id="map" style="height:600px;width:1000px;margin-left:200px;"></div>
+
+  </body>
+</html>
